@@ -1,4 +1,4 @@
-"""Laya sidecar: a drop-in, Jev-dialect /v1/systemone endpoint served from hhnode-185.
+"""Laya sidecar: a drop-in, Jev-dialect /v1/systemone endpoint served from remote-185.
 
 Accepts the same request shape jev-ultrafast sends to api.typesafe.ai
 (model/state/questions with choice|score|noul questions) and answers with
@@ -8,7 +8,7 @@ Run on the GPU node:
     ~/laya-venv/bin/pip install fastapi uvicorn
     nohup ~/laya-venv/bin/python ~/laya_jev_sidecar.py > ~/laya-sidecar.log 2>&1 &
 Then, from any machine with SSH access:
-    ssh -N -L 7185:127.0.0.1:8001 hhnode-185
+    ssh -N -L 7185:127.0.0.1:8001 remote-185
 and point the client at http://127.0.0.1:7185/v1/systemone
 """
 import math
@@ -151,7 +151,7 @@ async def systemone(body: dict):
         }
     return {
         "answers": answers,
-        "model": f"laya-421m-english@hhnode-185",
+        "model": f"laya-421m-english@remote-185",
         "usage": {
             "input_tokens": result.get("usage", {}).get("input_tokens", 0),
             "output_tokens": 0,

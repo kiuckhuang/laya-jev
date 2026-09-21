@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-shot Laya sidecar setup on a remote GPU/CPU server.
-# Usage: laya/setup_remote.sh [ssh-alias]   (default: hhnode-185)
+# Usage: laya/setup_remote.sh [ssh-alias]   (default: remote-185)
 #
 # Notes:
 # - Uses `python3 -m venv --system-site-packages` so an existing CUDA torch on
@@ -9,7 +9,7 @@
 #   export SSH_OPTS="-F $HOME/.ssh/config" before running this script.
 set -euo pipefail
 
-HOST_ALIAS="${1:-hhnode-185}"
+HOST_ALIAS="${1:-remote-185}"
 SSH_CMD=(ssh -o BatchMode=yes ${SSH_OPTS:-} "$HOST_ALIAS")
 SCP_CMD=(scp -o BatchMode=yes ${SSH_OPTS:-})
 

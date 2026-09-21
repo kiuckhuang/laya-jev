@@ -9,7 +9,7 @@ Everything here was verified live on 2026-09-21:
 | Host | Checkpoint | Latency / decision | Notes |
 | --- | --- | --- | --- |
 | WSL laptop (12-core CPU) | multilingual 322M | 29–40 ms | uncalibrated — misses cancellation threats |
-| `hhnode-185` (Quadro RTX 6000) | **English 421M** | **26–35 ms**, p95 ≈ p50 | temperature-calibrated; recommended |
+| `remote-185` (Quadro RTX 6000) | **English 421M** | **26–35 ms**, p95 ≈ p50 | temperature-calibrated; recommended |
 | TypeSafe cloud Jev | — | ~250 ms round trip | best zero-shot accuracy |
 
 Honest limitation, reproduced in testing: zero-shot **element-selection** is weak
@@ -37,10 +37,10 @@ repo's `validate_choice()`.
 
 ```bash
 # 1. Set up any server with SSH access (GPU optional, CPU works):
-laya/setup_remote.sh hhnode-185          # default host alias; runs over ssh
+laya/setup_remote.sh remote-185          # default host alias; runs over ssh
 
 # 2. Tunnel a local port to the sidecar (127.0.0.1:8001 on the server):
-ssh -N -L 7185:127.0.0.1:8001 hhnode-185 &
+ssh -N -L 7185:127.0.0.1:8001 remote-185 &
 
 # 3. Point the repo at it (.env):
 #    TYPESAFE_ENDPOINT=http://127.0.0.1:7185/v1/systemone
@@ -88,8 +88,8 @@ git fetch upstream && git rebase upstream/main   # or merge
 ## Stopping / restarting on the server
 
 ```bash
-ssh hhnode-185 'pkill -f "laya_jev_sideca[r]"'                       # stop
-ssh hhnode-185 'setsid nohup ~/laya-venv/bin/python ~/laya_jev_sidecar.py \
+ssh remote-185 'pkill -f "laya_jev_sideca[r]"'                       # stop
+ssh remote-185 'setsid nohup ~/laya-venv/bin/python ~/laya_jev_sidecar.py \
   > ~/laya-sidecar.log 2>&1 < /dev/null & sleep 40; \
   curl -s -X POST http://127.0.0.1:8001/health -H "Content-Type: application/json" -d "{}"'
 ```
