@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jev — Judgement Evaluation · Interactive explainer</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#101722; --panel2:#0d141d; --line:#1d2836; --text:#dce5f0;
+    --muted:#8496ab; --faint:#5b6b7f;
+    --jev:#34d399; --base:#7c8ba1; --gen:#fbbf24; --exec:#38bdf8; --ax:#a78bfa;
+    --resolve:#f87171; --guard:#f59e0b; --danger:#f87171;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,
+    "PingFang HK","Hiragino Sans TC","Microsoft JhengHei","Noto Sans TC",sans-serif;}
+  html[lang="zh-HK"] body{line-height:1.7}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+  a{color:#7dd3fc}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}
+  h2{font-size:20px;margin:44px 0 4px;letter-spacing:-.01em}
+  h2 .n{color:var(--faint);font-weight:600;margin-right:8px}
+  h3{font-size:16.5px;margin:32px 0 6px;letter-spacing:-.01em}
+  h3 .n{color:var(--faint);font-weight:600;margin-right:8px}
+  nav#topnav{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 30px}
+  nav#topnav a{color:#9db4c8;text-decoration:none;border:1px solid var(--line);border-radius:999px;
+    padding:5px 14px;font-size:12.5px;background:var(--panel)}
+  nav#topnav a:hover{color:#dce5f0;border-color:#33465e}
+  .quote{border-left:3px solid var(--exec);background:var(--panel2);padding:10px 14px;
+    border-radius:0 10px 10px 0;color:var(--muted);font-size:13.5px;margin:16px 0 6px}
+  .quote b{color:var(--text)}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .note{color:var(--muted);font-size:13.5px;margin:6px 0 14px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 8px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:10px 14px;min-width:150px}
+  .chip .v{font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .chip .v em{font-style:normal;color:var(--jev)}
+  .chip .v s{color:var(--base);text-decoration:none}
+  .chip .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  html[lang="zh-HK"] .chip .k{letter-spacing:.02em}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .btn{appearance:none;border:1px solid var(--line);background:#16202e;color:var(--text);
+    border-radius:9px;padding:7px 14px;font-size:13.5px;cursor:pointer}
+  .btn:hover{border-color:#33465e}
+  .btn.primary{background:#123529;border-color:#1f5c43;color:#a7f3d0}
+  .btn:disabled{opacity:.45;cursor:default}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:0;background:transparent;color:var(--muted);padding:7px 12px;font-size:13px;cursor:pointer}
+  .seg button.active{background:#16202e;color:var(--text)}
+  #langSeg{margin-left:auto}
+  #langSeg button{font-weight:600}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0 4px;font-size:12.5px;color:var(--muted)}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+  /* Part 1 — loop anatomy */
+  #loopDiagram{display:flex;flex-direction:column;gap:10px}
+  .phase{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;
+    border:1px solid var(--line);background:var(--panel2);transition:all .25s;opacity:.45}
+  .phase.active{opacity:1;border-color:#2a5f4b;background:#0f1d18;transform:translateX(4px)}
+  .phase.done{opacity:.75}
+  .phase .tag{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);min-width:86px}
+  html[lang="zh-HK"] .phase .tag{text-transform:none;letter-spacing:.03em}
+  .phase .body{flex:1}
+  .phase .t{font-weight:600}
+  .phase .d{color:var(--muted);font-size:12.5px;margin-top:1px}
+  .phase .cost{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--muted);white-space:nowrap}
+  .phase.active .cost{color:#a7f3d0;border-color:#1f5c43}
+  .fanout{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .head{font-size:12px;border:1px dashed #33465e;border-radius:8px;padding:5px 10px;color:var(--muted);
+    transition:all .3s}
+  .head.win{border:1px solid var(--jev);color:var(--jev);background:#0c211a}
+  .head.dead{opacity:.35;text-decoration:line-through}
+  #loopCaption{min-height:44px;color:var(--muted);font-size:13.5px;margin-top:12px;padding:10px 14px;
+    border-left:3px solid var(--jev);background:var(--panel2);border-radius:0 10px 10px 0}
+  #loopCaption b{color:var(--text)}
+  .ctrls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+
+  /* Part 2 — composition bars */
+  .compbar{margin:20px 0 6px}
+  .compbar .label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+  .compbar .label b{font-size:15px}
+  .bar{display:flex;height:34px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .bar span{display:block;height:100%;position:relative}
+  .compnote{color:var(--muted);font-size:13px;margin-top:12px}
+  .compnote b{color:var(--text)}
+  .callout{border:1px solid #1f5c43;background:#0c1a14;border-radius:12px;padding:12px 16px;margin-top:14px;font-size:13.5px;color:#c7e8d9}
+
+  /* Part 3 — waterfall */
+  #wfWrap{position:relative}
+  #wf{width:100%;height:auto;display:block}
+  #wf text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  html[lang="zh-HK"] #wf text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"PingFang HK","Microsoft JhengHei","Noto Sans TC",monospace}
+  #tooltip{position:fixed;pointer-events:none;background:#0b1119;border:1px solid #2a3b52;border-radius:9px;
+    padding:8px 11px;font-size:12.5px;color:var(--text);opacity:0;transition:opacity .12s;z-index:9;max-width:340px}
+  #tooltip .tt-t{font-weight:700;margin-bottom:3px}
+  #tooltip .tt-d{color:var(--muted)}
+  #wfStep{margin-top:14px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+    font-size:13.5px;color:var(--muted);min-height:64px}
+  #wfStep b{color:var(--text)}
+  .mark{font-size:12px}
+
+  /* Part 4 — dumbbells */
+  #dumb{width:100%;height:auto;display:block}
+  #dumb text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  html[lang="zh-HK"] #dumb text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"PingFang HK","Microsoft JhengHei","Noto Sans TC",monospace}
+  .caveat{color:var(--muted);font-size:13px;margin-top:12px;border-left:3px solid var(--guard);padding:8px 12px;background:var(--panel2);border-radius:0 8px 8px 0}
+  footer{margin-top:56px;color:var(--faint);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .mini{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel2)}
+  .mini .h{font-weight:700;font-size:13.5px;margin-bottom:4px}
+  .mini .b{color:var(--muted);font-size:12.5px}
+  /* Part 6 — Kahneman */
+  .ktable{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 16px}
+  .ktable th,.ktable td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  .ktable th{background:var(--panel2);font-weight:700}
+  .ktable th:first-child{width:1px;white-space:nowrap}
+  .ktable td:first-child{color:var(--muted);white-space:nowrap;font-size:12.5px}
+  .kcard{border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-top:10px;overflow:hidden;transition:border-color .2s}
+  .kcard.open{border-color:#2a5f4b}
+  .khead{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 14px;cursor:pointer;
+    color:var(--text);font-weight:600;font-size:13.5px;user-select:none}
+  .khead:hover{background:#121b28}
+  .karrow{color:var(--faint);font-weight:400}
+  .kbody{display:none;padding:0 14px 13px;color:var(--muted);font-size:13px}
+  .kcard.open .kbody{display:block}
+  .kbody b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:280px">
+      <h1 id="h1"></h1>
+      <p class="sub" id="subTitle"></p>
+    </div>
+    <div class="seg" id="langSeg" role="group" aria-label="Language">
+      <button data-l="en" class="active">English</button>
+      <button data-l="zhHK">粵語〈香港〉</button>
+    </div>
+  </div>
+
+  <nav id="topnav">
+    <a href="#sec-intro" data-i18n="navIntro"></a>
+    <a href="#sec-book" data-i18n="navBook"></a>
+    <a href="#sec-how" data-i18n="navHow"></a>
+    <a href="#sec-demo" data-i18n="navDemo"></a>
+  </nav>
+
+  <h2 id="sec-intro" style="margin-top:24px"><span class="n">1</span><span data-i18n="secIntro_h"></span></h2>
+  <p data-i18n="introA" style="color:var(--text);font-size:15.5px;margin:8px 0 10px"></p>
+  <p data-i18n="introB"></p>
+
+  <div class="chips">
+    <div class="chip"><div class="v"><s>9.45 s</s> → <em>7.09 s</em></div><div class="k" data-i18n="chipTime"></div></div>
+    <div class="chip"><div class="v"><s>1,092</s> → <em>101</em></div><div class="k" data-i18n="chipCdp"></div></div>
+    <div class="chip"><div class="v"><s>22</s> → <em>17</em></div><div class="k" data-i18n="chipTs"></div></div>
+    <div class="chip"><div class="v">178 <span style="font-size:13px;color:var(--muted)">ms</span></div><div class="k" data-i18n="chipLat"></div></div>
+    <div class="chip"><div class="v">$0.000063</div><div class="k" data-i18n="chipCost"></div></div>
+  </div>
+
+  <div class="quote" data-i18n="introGoal"></div>
+
+  <!-- ============ SECTION 2 · THE BOOK ============ -->
+  <h2 id="sec-book"><span class="n">2</span><span data-i18n="p6h"></span></h2>
+  <p class="note" data-i18n="p6note"></p>
+  <div class="panel">
+    <div id="kb"></div>
+    <div class="callout" id="kbCallout" style="margin-top:16px"></div>
+  </div>
+
+  <!-- ============ SECTION 3 · HOW IT WORKS ============ -->
+  <h2 id="sec-how"><span class="n">3</span><span data-i18n="secHow_h"></span></h2>
+  <p class="note" data-i18n="secHow_note"></p>
+
+  <!-- ==== 3.1 LOOP ANATOMY ==== -->
+  <h3><span class="n">3.1</span><span data-i18n="p1h"></span></h3>
+  <p class="note" data-i18n="p1note"></p>
+  <div class="panel">
+    <div id="loopDiagram"></div>
+    <div id="loopCaption"></div>
+    <div class="ctrls">
+      <button class="btn primary" id="loopPlay"></button>
+      <button class="btn" id="loopPrev"></button>
+      <button class="btn" id="loopNext"></button>
+      <button class="btn" id="loopReset"></button>
+      <span style="color:var(--faint);font-size:12.5px" id="loopPos"></span>
+    </div>
+  </div>
+
+  <!-- ==== 3.2 ELIMINATED CALLS ==== -->
+  <h3><span class="n">3.2</span><span data-i18n="p2h"></span></h3>
+  <p class="note" data-i18n="p2note"></p>
+  <div class="panel">
+    <div class="compbar">
+      <div class="label"><b data-i18n="origLoop"></b><span class="mono">1,092 calls</span></div>
+      <div class="bar" id="barBase"></div>
+    </div>
+    <div class="compbar">
+      <div class="label"><b data-i18n="jevLoop"></b><span class="mono">97 calls</span></div>
+      <div class="bar" id="barCand"></div>
+    </div>
+    <div class="legend" id="compLegend"></div>
+    <div class="compnote" id="compNote"></div>
+    <div class="callout" id="compCallout"></div>
+  </div>
+
+  <!-- ==== 3.3 WHAT CHANGED ==== -->
+  <h3><span class="n">3.3</span><span data-i18n="p5h"></span></h3>
+  <div class="grid2">
+    <div class="mini"><div class="h" data-i18n="w1h"></div><div class="b" data-i18n="w1b"></div></div>
+    <div class="mini"><div class="h" data-i18n="w2h"></div><div class="b" data-i18n="w2b"></div></div>
+    <div class="mini"><div class="h" data-i18n="w3h"></div><div class="b" data-i18n="w3b"></div></div>
+    <div class="mini"><div class="h" data-i18n="w4h"></div><div class="b" data-i18n="w4b"></div></div>
+  </div>
+
+  <!-- ============ SECTION 4 · INTERACTIVE DEMO ============ -->
+  <h2 id="sec-demo"><span class="n">4</span><span data-i18n="secDemo_h"></span></h2>
+  <p class="note" data-i18n="secDemo_note"></p>
+
+  <!-- ==== 4.1 RECORDED RUN ==== -->
+  <h3><span class="n">4.1</span><span data-i18n="p3h"></span></h3>
+  <p class="note" data-i18n="p3note"></p>
+  <div class="panel">
+    <div class="ctrls" style="margin:0 0 10px">
+      <button class="btn primary" id="wfPlay"></button>
+      <div class="seg" id="wfSpeed">
+        <button data-s="0.5">0.5×</button><button data-s="1" class="active">1×</button>
+        <button data-s="2">2×</button><button data-s="4">4×</button>
+      </div>
+      <span style="color:var(--faint);font-size:12.5px" data-i18n="wfHint"></span>
+      <span class="mono" id="wfClock" style="margin-left:auto;font-size:15px">0.000 s</span>
+    </div>
+    <div id="wfWrap">
+      <svg id="wf" viewBox="0 0 1060 470" role="img" aria-label="Waterfall of the recorded run"></svg>
+      <div id="tooltip"></div>
+    </div>
+    <div class="legend" id="wfLegend"></div>
+    <div id="wfStep"></div>
+    <div class="legend" style="margin-top:10px" id="wfCounters"></div>
+  </div>
+
+  <!-- ==== 4.2 MATCHED A/B ==== -->
+  <h3><span class="n">4.2</span><span data-i18n="p4h"></span></h3>
+  <p class="note" data-i18n="p4note"></p>
+  <div class="panel">
+    <div class="ctrls" style="margin:0 0 8px">
+      <div class="seg" id="metricSeg">
+        <button data-m="ms" class="active" data-i18n="mMs"></button>
+        <button data-m="cdp" data-i18n="mCdp"></button>
+        <button data-m="ts" data-i18n="mTs"></button>
+      </div>
+    </div>
+    <svg id="dumb" viewBox="0 0 1060 300" role="img" aria-label="Matched comparison dumbbell chart"></svg>
+    <div class="caveat" id="abNote"></div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+"use strict";
+/* ============================ i18n ============================ */
+const STR = {
+en: {
+  title:"Jev — Judgement Evaluation · Interactive explainer",
+  h1:`<span style="color:var(--jev)">Jev</span> — Judgement Evaluation`,
+  subTitle:"A visual explainer of TypeSafe's “System One” judgement-evaluation model, built entirely on this repo's real measurements. The worked example throughout: one natural-language goal → a 7.073-second Google Flights search.",
+  chipTime:"median task time · −25%", chipCdp:"browser protocol calls · −91%",
+  chipTs:"TypeSafe (Jev) requests", chipLat:"median Jev decision", chipCost:"total text-helper cost",
+  navIntro:"Introduction", navBook:"The Kahneman connection", navHow:"How it works", navDemo:"Interactive demo",
+  secIntro_h:"Introduction",
+  introA:"<b>Judgement evaluation</b> is the whole contract: you hand Jev a state and a closed set of possible answers, and it returns typed decisions with calibrated probabilities in ~100–250 ms. No text generation, no chain-of-thought — just fast, structured judgement your code can act on.",
+  introB:"This page shows what that looks like in practice, using nothing but this repo's real measurements. <b>Section 2</b> sets the frame with Kahneman's <i>Thinking, Fast and Slow</i> (Traditional Chinese edition 《快思慢想》) — Jev is a System 1 for software. <b>Section 3</b> shows how the loop works and where 991 browser calls were eliminated. <b>Section 4</b> is hands-on: replay the real 7.073-second run action by action, then compare the matched A/B measurements. Every number is real — sources in the footer.",
+  introGoal:`The task given to the agent: “<b>Find one-way flights from Zurich to London on September 20, 2026, for one adult in economy. Stop when matching flight options are visible. Do not select or book a flight.</b>” — verified independently afterwards: one-way ✓ Zürich ✓ London ✓ date ✓ 3 flights visible.`,
+  secHow_h:"How it works",
+  secHow_note:"Three mechanisms carry the whole design: <b>one atomic snapshot</b> per observation, <b>one speculative request</b> per decision, and <b>guards instead of invalidation</b> before input.",
+  secDemo_h:"The interactive demo",
+  secDemo_note:"Press play. The first chart replays the recorded run with a live clock; the second compares the matched A/B pairs. Hover, click and switch metrics freely.",
+  p1h:"Anatomy of one decision — why the loop is cheap",
+  p1note:"Step through the optimized loop. The trick: <b>one</b> atomic snapshot, <b>one</b> network request that speculatively answers every compatible question, and only the winning target is consumed.",
+  p2h:"Where the 991 eliminated calls went",
+  p2note:"Same task, same Chrome, same Jev model — frozen original loop vs. the optimized loop (median pair, pair 3). The browser did <b>exactly the same 26 input events</b> in both arms. Everything removed was overhead spent <i>reading</i> the page.",
+  origLoop:"Original loop", jevLoop:"Jev ultrafast loop",
+  p3h:"The real run, millisecond by millisecond",
+  p3note:"Actual recorded 7.073 s run (17 Jev requests, 11 actions + 1 explicit WAIT, 2 text-helper calls). Gaps in the bars are Google's own autocomplete and results loading — not agent overhead.",
+  wfHint:"hover any segment · click a row for details",
+  p4h:"Matched A/B — three alternating pairs",
+  p4note:"Six runs, one task, one Chrome profile, identical models on both arms (the difference is the loop, not the model). No failures, no exclusions.",
+  mMs:"Task time", mCdp:"Browser calls", mTs:"TypeSafe requests",
+  p5h:"What actually changed",
+  w1h:"One atomic snapshot vs repeated tree reads",
+  w1b:"The original loop re-read the accessibility tree (30×) and resolved 828 DOM nodes. The new snapshot.js reads all visible controls, labels, values and geometry in a single evaluate.",
+  w2h:"Speculative fan-out, one round trip",
+  w2b:"Operation and every compatible target head share one request. Unused heads are discarded — two decisions for the price of one network call.",
+  w3h:"Guards instead of invalidation",
+  w3b:"Original: any DOM mutation (including animations) invalidated the decision. New: validate the selected target — identity, geometry, occlusion — right before input.",
+  w4h:"Wait for useful state",
+  w4b:"After typing into a combobox, wait up to 200 ms for visible suggestions — so Jev chooses from the real popup, not a stale page.",
+  p6h:"The Kahneman connection — the book, implemented",
+  p6note:"Everything above is <i>Thinking, Fast and Slow</i> in software form: <b>Jev is a System 1</b> — fast, intuitive, no deliberation; <b>the reasoning LLM is System 2</b> — slow, expensive, mobilized only when words must be produced. Click each card to see the mapping.",
+  kb:{
+    t1:"System 1 · Jev", t2:"System 2 · reasoning LLM",
+    rows:[
+      {k:"Speed", a:"~100–250 ms per judgment", b:"seconds–minutes of chain-of-thought"},
+      {k:"Output", a:"typed answer + calibrated probability", b:"generated text — must be parsed"},
+      {k:"Cost per call", a:"a fraction of a cent", b:"orders of magnitude more"},
+      {k:"Error mode", a:"fast wrong answers, no self-doubt", b:"fluent confabulation, with reasoning attached"},
+      {k:"Role in the 7 s run", a:"17 decisions — every loop step", b:"2 calls, 927 ms total — the two typed strings"},
+      {k:"Workload share", a:"nearly everything, until surprise", b:"the exception path only"},
+    ],
+    cards:[
+     {t:"Division of labour — let System 1 drive",
+      b:`17 System-1 decisions in 7 seconds; the reasoning LLM speaks only twice (581 ms for “Zurich”, 346 ms for “London”). Fast intuitions do the volume; deliberate generation appears only when words are needed — the mind's economy, per Kahneman, with the loop playing the habitual self.`},
+     {t:"Cognitive ease → the escalation funnel",
+      b:`Confidence-gated routing is <b>“ease vs strain” as an API</b>: act while calibrated confidence is high; escalate to a bigger model or a human when it drops. The same logic as this harness handing bulk sub-tasks to cheaper models and synthesizing on a stronger one — the cascade, applied at three grain sizes: per decision, per failure, per task.`},
+     {t:"Procedures beat introspection",
+      b:`Kahneman's confession: a career studying bias didn't make his intuition less overconfident — <b>only procedures protect you</b>. Hence this repo's structure: <span class="mono">validate_choice</span> rejects invented answers, decisions are consumed once (a retry can never double-click), and DONE is never trusted — 7 independent checks instead of the model's word.`},
+     {t:"WYSIATI — What You See Is All There Is",
+      b:`The model weaves a coherent story from exactly its context — and <b>page text is that context</b>, so injected text becomes its “reality”. The defenses are structural, not smarter reasoning: choices restricted to observed nodes, page text flagged untrusted, and selectors never model-made.`},
+    ],
+    callout:`📖 <b>If the book landed for you:</b> Kahneman's own admission was that decades of studying bias left his intuitive thinking just as overconfident — the fix is external procedure, which is exactly what every guard in this repo is. His sequel <b><i>Noise</i></b> (2021, with Sibony &amp; Sunstein) is the direct continuation: variance in judgment and “decision hygiene” — the case for typed, calibrated decisions over free-form ones. (Traditional Chinese edition: <a href="https://www.eslite.com/product/10012030542682410260007" target="_blank" rel="noopener">《快思慢想》</a>, trans. Hung-lan, Global View Publishing.)`},
+  play:"▶ Play", pause:"⏸ Pause", prev:"← Prev", next:"Next →", reset:"Reset",
+  stepPos:(i,n)=>`step ${i} / ${n}`,
+  loopSteps:{ // captions + phases
+    phases:[
+     {t:"Observe the page — once", d:"snapshot.js reads visible controls, names, values, roles and geometry in ONE Runtime.evaluate.", cost:"+1 CDP call",
+      cap:"The old loop read the <b>full accessibility tree</b> and resolved nodes individually — 30 AX-tree reads and 828 DOM.resolveNode calls per task. Here: <b>one atomic read</b> that preserves real DOM node references."},
+     {t:"Index the elements", d:"Controls become a numbered table: [1] button · [2] combobox · [3] textbox …", cost:"in-page, 0 calls",
+      cap:"Each target later refers to an <b>observed index</b>. The model can only pick from what was actually seen — it can never invent a selector."},
+     {t:"One TypeSafe request — speculative fan-out", d:"Operation head + one target head per compatible operation, all answered in parallel.", cost:"1 API call", fanout:true,
+      cap:"<b>Two decisions, one network round trip.</b> The request carries four questions; the unused target heads are simply discarded."},
+     {t:"Consume only the winner", d:"If the operation is TYPE_TEXT, only type_text_target executes — click/select targets expire unread.", cost:"0 calls",
+      cap:"A click can never consume a text target and vice-versa. The validator rejects invented choices, NaN probabilities, and non-max picks before anything executes."},
+     {t:"Guard, then act", d:"Re-check freshness, resolve current geometry, hit-test for occlusion — right before input.", cost:"+2 CDP calls",
+      cap:"Animation no longer invalidates anything: geometry is resolved <b>at the last moment</b>. A covered or moved control is refused instead of mis-clicked."},
+     {t:"Type via the small LLM — only when needed", d:"TYPE_TEXT invokes Mercury (581 ms for “Zurich”, 346 ms for “London”). Nothing is hardcoded.", cost:"1 text API call",
+      cap:"Text is generated live from the goal, validated as strict JSON, and reused only if the entire helper input is unchanged on a stale retry."},
+     {t:"Settle, log, repeat", d:"Brief bounded wait (≤50 ms, 200 ms after combobox typing), execution is logged, page re-observed.", cost:"+1 CDP call",
+      cap:"Execution is logged <b>before</b> observing its result, so a stale read can never erase an action. The whole cycle: ≈4 browser calls and 1 API request."},
+    ],
+    fanHeads:{win1:"operation → TYPE_TEXT ✓", dead1:"click_target [1..40] — discarded", dead2:"select_target — discarded", win2:`type_text_target → [15] “Where from?” ✓`},
+  },
+  comp:{ // composition descriptions
+    base:[
+     {k:"DOM.resolveNode", d:"resolving DOM nodes one by one, repeatedly"},
+     {k:"Runtime.evaluate", d:"scattered page reads"},
+     {k:"Runtime.callFunctionOn", d:"per-node function calls"},
+     {k:"Accessibility.getFullAXTree", d:"full accessibility-tree reads"},
+     {k:"DOM.getBoxModel + getNodeForLocation", d:"guard lookups"},
+     {k:"Input.* (click, key, text)", d:"the actual work"}],
+    cand:[
+     {k:"Runtime.evaluate", d:"atomic snapshots + in-page guards"},
+     {k:"Input.* (click, key, text)", d:"the actual work — identical to baseline"}],
+    note:(rd,cd)=>`Both arms performed the <b>same 26 input events</b> (20 mouse, 4 key, 2 insertText). Reading-the-page overhead fell <b class="mono">${rd} → ${cd}</b>, while total wall time fell 9.45 s → 7.09 s. The candidate spends <i>fewer, fatter</i> evaluates (71 vs 148) because each one reads everything at once.`,
+    callout:`💡 <b>The smoking gun:</b> <span class="mono" style="color:var(--resolve)">DOM.resolveNode × 828</span> — the original loop resolved individual DOM nodes over and over (≈1.2–1.8 s of pure wall time per run), plus 30 full accessibility-tree reads (<span class="mono" style="color:var(--ax)">Accessibility.getFullAXTree</span>, ≈1.2–1.4 s) and 40 <span class="mono">Runtime.callFunctionOn</span>. The optimized loop replaces all of it with one JavaScript snapshot that reads visible controls, names, values and geometry in a single <span class="mono">Runtime.evaluate</span> — and uses cheap in-page guards instead of re-reading.`,
+    hover:"— hover bars for details"},
+  wf:{
+    legend:["Jev decision","text generated (Mercury)","execute + observe","results loading / DONE"],
+    stepDefault:"Click any row to inspect the action.",
+    tipDecide:(ms,d)=>`<b>Jev decides</b> · ${ms} ms<br><span class="tt-d">${d}</span>`,
+    tipText:(v,ms)=>`<b>Mercury writes “${v}”</b> · ${ms} ms<br><span class="tt-d">small LLM · real generation</span>`,
+    tipExec:(ms)=>`<b>Execute + observe</b> · ${ms} ms<br><span class="tt-d">guards → input → screenshotless read</span>`,
+    tipDone:()=>"<b>Results load + final Jev request</b><br><span class='tt-d'>independent verification passed all 7 checks</span>",
+    searchMark:"Search executed · 5.217 s",
+    counters:(req,ts,acts,texts,t)=>`<span>Jev requests <b class="mono" style="color:var(--text)">${req}/${ts}</b> <span style="color:var(--faint)">(incl. 5 re-asked after page changes)</span></span>
+     <span>actions executed <b class="mono" style="color:var(--text)">${acts}/11</b></span>
+     <span>text calls <b class="mono" style="color:var(--text)">${texts}/2</b></span>
+     <span style="margin-left:auto" class="mono" id="wfClock2">${t} s</span>`,
+    stepHdr:(i,op)=>`<b>Step ${i} · ${op}</b>`,
+    typed:(v,ms,tok)=>`Typed value: <b>“${v}”</b> — generated by Mercury in ${ms} ms (prompt ≈${tok} tokens)`,
+    decideLine:(ms,exec,el)=>`Jev decision: ${ms} ms · executed at ${exec} s · observation settled at ${el} s`,
+    verifyLine:"Independent verification: search_page ✓ one_way ✓ origin ✓ destination ✓ date ✓ year ✓ results ✓"},
+  dumb:{
+    axisMs:"task time (s)", axisCdp:"browser protocol calls", axisTs:"TypeSafe requests",
+    pair:n=>`Pair ${n}`, median:"Median", orig:"Original loop", cand:"Jev ultrafast loop",
+    medOf:"median of 3",
+    legend:`<tspan fill="#7c8ba1">●</tspan> original loop&nbsp;&nbsp;&nbsp;<tspan fill="#34d399">●</tspan> jev ultrafast`,
+    tipBase:(p,v,ts,cdp)=>`<b>Original loop</b> · pair ${p}<br><span class='tt-d'>${v} · ${ts} TypeSafe requests · ${cdp} CDP calls</span>`,
+    tipCand:(p,v,ts,cdp)=>`<b>Jev ultrafast loop</b> · pair ${p}<br><span class='tt-d'>${v} · ${ts} TypeSafe requests · ${cdp} CDP calls</span>`,
+    tipBaseMed:v=>`<b>Original loop</b> · median of 3<br><span class='tt-d'>${v}</span>`,
+    tipCandMed:v=>`<b>Jev ultrafast loop</b> · median of 3<br><span class='tt-d'>${v}</span>`},
+  ab:{
+    ms:"The optimized arm won all three pairs (sign-test p = 0.25 with n=3 — direction is consistent, the evidence is thin by design). Both arms ran the same Jev + Mercury models; the delta is the loop code.",
+    cdp:"Calls collapsed 1,092 → 101 (median) while the actual input events stayed identical (26 = 26). The entire reduction is page-reading overhead, not less automation.",
+    ts:"TypeSafe requests fell 22 → 17 (median): fewer re-observations and fewer invalidated decisions per action."},
+  foot:`Sources: <span class="mono">docs/performance.md</span> · <span class="mono">docs/flights-measurement.json</span> (recorded run + per-action timings) · <span class="mono">docs/full-speed-measurement.json</span> (matched pairs + per-run CDP composition) · <span class="mono">docs/measurement.json</span>.<br>
+    Honest caveats: the A/B is <b>3 pairs</b> on <b>one task</b> and one browser profile (two-sided sign-test p = 0.25 — indicative, not statistical proof); Google's network and caches are live; browser setup, initial navigation and independent post-run verification sit outside the clock. A DONE choice is never treated as proof — outcomes were verified independently. The Part-1 diagram is a faithful walkthrough of <span class="mono">agent.py</span> / <span class="mono">snapshot.js</span>, with call counts from the measured medians.`},
+zhHK: {
+  title:"Jev · 判斷評估 · 互動解說",
+  h1:`<span style="color:var(--jev)">Jev</span> · 判斷評估`,
+  subTitle:"用本 repo 嘅真實量度數據，拆解 TypeSafe 嘅「系統 1」判斷評估模型。貫穿全頁嘅實例：一句自然語言目標 → 7.073 秒完成 Google Flights 搜尋。",
+  chipTime:"中位數任務時間 · −25%", chipCdp:"瀏覽器協議調用 · −91%",
+  chipTs:"TypeSafe（Jev）請求", chipLat:"Jev 中位決策時間", chipCost:"文字助手總成本",
+  navIntro:"簡介", navBook:"卡尼曼連結", navHow:"點樣運作", navDemo:"互動示範",
+  secIntro_h:"簡介",
+  introA:"<b>判斷評估</b>就係成份合約：交一個狀態、一組封閉答案俾 Jev，佢就喺約 100–250 ms 內回傳有類型嘅決定加校準概率。唔生成文字、冇思考鏈——只有快而結構化、代碼即刻用得嘅判斷。",
+  introB:"呢一頁用本 repo 嘅真實量度數據，示範佢喺瀏覽器 agent 入面實際係點。<b>第 2 節</b>用卡尼曼《快思慢想》起個框架——Jev 就係軟件嘅系統 1。<b>第 3 節</b>拆解個 loop 點運作、嗰 991 次瀏覽器調用點樣慳返。<b>第 4 節</b>係動手玩：逐步重播實測嘅 7.073 秒 run，再對照三對 A/B 數據。每個數字都係真嘅——出處喺頁尾。",
+  introGoal:`交俾 agent 嘅任務：「<b>搵一班 2026 年 9 月 20 日蘇黎世去倫敦嘅單程機，一位成人，經濟艙。見到符合嘅航班就停。唔好揀機、唔好買機。</b>」——事後獨立驗證：單程 ✓ 蘇黎世 ✓ 倫敦 ✓ 日期 ✓ 見到 3 班機。`,
+  secHow_h:"點樣運作",
+  secHow_note:"三個機制撐起成個設計：每次觀察<b>一次原子快照</b>、每次決策<b>一個投機請求</b>，輸入之前<b>用護衞代替作廢</b>。",
+  secDemo_h:"互動示範",
+  secDemo_note:"㩒播放。第一個圖有即時時鐘，逐步重播實測 run；第二個對照三對 A/B 數據。隨便懸停、點擊、轉指標。",
+  p1h:"一次決策嘅解剖——點解個 loop 咁慳",
+  p1note:"逐步行一次優化後嘅 loop。竅門：<b>一次</b>原子快照、<b>一個</b>網絡請求投機式答晒所有相容問題，最後只消耗中選嗰個 target。",
+  p2h:"嗰 991 次慳咗嘅調用去咗邊？",
+  p2note:"同一個任務、同一個 Chrome、同一個 Jev 模型——凍結嘅原始 loop vs 優化後嘅 loop（中位數嗰對，即 pair 3）。兩邊瀏覽器做嘅 <b>26 次輸入事件完全一樣</b>。刪走嘅，全部係攞嚟<i>讀頁面</i>嘅開銷。",
+  origLoop:"原始 loop", jevLoop:"Jev ultrafast loop",
+  p3h:"真實 run，逐毫秒睇",
+  p3note:"實測錄影嘅 7.073 秒 run（17 次 Jev 請求、11 個動作加 1 次明確 WAIT、2 次文字助手調用）。棒與棒之間嘅空隙係 Google 自己嘅 autocomplete 同結果載入——唔係 agent 開銷。",
+  wfHint:"懸停睇段落 · 點一行睇詳情",
+  p4h:"對照實驗——三對交替 run",
+  p4note:"六次 run、一個任務、一個 Chrome profile，兩邊模型完全相同（分別在於 loop，唔係模型）。零失敗、零剔除。",
+  mMs:"任務時間", mCdp:"瀏覽器調用", mTs:"TypeSafe 請求",
+  p5h:"實際改咗乜",
+  w1h:"一次原子快照 vs 重複讀樹",
+  w1b:"原始 loop 重複讀無障礙樹（30 次）、解析 828 個 DOM node。新嘅 snapshot.js 一次 evaluate 讀齊所有可見控件、標籤、數值同幾何。",
+  w2h:"投機式 fan-out，一次來回",
+  w2b:"Operation 同所有相容 target head 共用一個請求。用唔着嘅 head 直接丟棄——一個網絡調用嘅價錢，兩個決策。",
+  w3h:"用護衞代替作廢",
+  w3b:"舊：任何 DOM 變動（包括動畫）都會作廢決策。新：輸入前一刻先驗證目標——身份、幾何、遮擋。",
+  w4h:"等到有用狀態先行",
+  w4b:"喺 combobox 打完字，最多等 200 ms 等建議出現——Jev 揀嘅係真彈出選單，唔係過期頁面。",
+  p6h:"卡尼曼嘅連結——《快思慢想》嘅軟件版",
+  p6note:"上面成個故仔，其實係《快思慢想》嘅軟件版。康納曼介紹兩位主角：「快思嘅系統1很情緒化，依賴直覺，擅長編故事……但它很容易上當，以為親眼所見就是事情的全貌」；「慢想嘅系統2擅長邏輯分析……不易出錯卻很懶惰，經常走捷徑，直接採納系統1嘅判斷結果」。<b>Jev 就係系統 1</b>——快、直覺、唔經深思；<b>推理型 LLM 係系統 2</b>——慢、貴，要到要產生文字先出動。逐一張卡撳開，睇下本書點樣對應落代碼。",
+  kb:{
+    t1:"系統 1 · Jev", t2:"系統 2 · 推理型 LLM",
+    rows:[
+      {k:"速度", a:"每次判斷約 100–250 ms", b:"成條思考鏈，幾秒到幾分鐘"},
+      {k:"輸出", a:"有類型答案 + 校準概率", b:"生成文字——要再解析"},
+      {k:"每次成本", a:"一個仙都唔使", b:"貴幾個數量級"},
+      {k:"犯錯方式", a:"快而錯，唔識自我懷疑", b:"流暢咁作故事，仲附送推理"},
+      {k:"喺 7 秒 run 入面", a:"17 次決策——loop 每一步", b:"2 次、共 927 ms——淨係嗰兩個字串"},
+      {k:"工作量", a:"差唔多全部，有意外先讓路", b:"淨係例外路徑"},
+    ],
+    cards:[
+     {t:"分工——讓系統 1 掟軚",
+      b:`7 秒之內 17 次系統 1 決策；推理型 LLM 只開口兩次（581 ms「Zurich」、346 ms「London」）。快直覺做量，深思熟慮只喺要打字先出場——就係卡尼曼筆下個腦嘅經濟學，個 loop 就係習慣性嘅自我。`},
+     {t:"認知放鬆 → 升級漏斗",
+      b:`信心門控路由就係<b>「放鬆 vs 費力」嘅 API 版</b>：校準信心高就行動，跌低就升級去更大模型或者人。同 harness 將大量子任務交俾平價模型、最後由強模型統合，係同一套邏輯——呢個級聯有三個粒度：逐決策、逐失敗、逐任務。`},
+     {t:"程序勝過內省",
+      b:`卡尼曼自白：研究偏誤成世，佢自己嘅直覺照舊過度自信——<b>靠得住嘅只有程序</b>。所以呢個 repo 先咁設計：<span class="mono">validate_choice</span> 擋返作數答案、決策用一次即作廢（重試點都唔會雙擊）、DONE 永遠唔信——用 7 項獨立檢查，唔信模型把口。`},
+     {t:"WYSIATI——眼見即全部",
+      b:`個模型只會根據佢收到嘅上下文編一個合理故事——而<b>頁面文字就係上下文</b>，所以注入嘅文字會變成佢嘅「現實」。防禦係結構性嘅，唔係靠更聰明：選擇限於觀察過嘅節點、頁面文字標記為不可信、selector 永遠唔由模型生。`},
+    ],
+    callout:`📖 <b>如果本書啱你胃口：</b>卡尼曼自己承認，研究偏誤幾十年，佢嘅直覺思維一樣咁過度自信——解藥係外部程序，而呢個 repo 每個 guard 都係一份噉嘅程序。佢嘅續作 <b><i>Noise</i></b>（2021，同 Sibony、Sunstein 合著）係正統延續：講判斷嘅變異同「決策衛生」——正正就係「有類型、有校準嘅決定」勝過自由發揮嘅論證。<br>📚 中文版：《快思慢想》（新版），康納曼（Daniel Kahneman）著、洪蘭譯，天下文化出版，繁體中文 576 頁。<a href="https://www.eslite.com/product/10012030542682410260007" target="_blank" rel="noopener">誠品線上介紹 ↗</a>`},
+  play:"▶ 播放", pause:"⏸ 暫停", prev:"← 上一步", next:"下一步 →", reset:"重設",
+  stepPos:(i,n)=>`第 ${i} / ${n} 步`,
+  loopSteps:{
+    phases:[
+     {t:"觀察頁面——一次過", d:"snapshot.js 用一次 Runtime.evaluate 讀齊可見控件、名稱、數值、角色同幾何位置。", cost:"+1 次 CDP 調用",
+      cap:"舊 loop 會讀<b>完整個無障礙樹</b>、逐個 node 解析——成個 task 30 次 AX-tree 讀取加 828 次 DOM.resolveNode。而家：<b>一次原子讀取</b>，仲保留真實 DOM node 引用。"},
+     {t:"將控件變索引", d:"控件變成一張有編號嘅表：[1] 按鈕 · [2] 下拉框 · [3] 文字框 …", cost:"頁面內處理，0 調用",
+      cap:"之後每個 target 都只可以指向<b>觀察過嘅索引</b>。個模型只能喺實際見過嘅選項入面揀——永遠冇得作 selector。"},
+     {t:"一個 TypeSafe 請求——投機式 fan-out", d:"Operation head 加埋每個相容 operation 嘅 target head，一次過並行作答。", cost:"1 次 API 調用", fanout:true,
+      cap:"<b>兩個決策，一次網絡來回。</b>請求帶住四條問題，用唔着嘅 target head 直接丟棄。"},
+     {t:"只消耗中選嗰個", d:"如果 operation 係 TYPE_TEXT，只有 type_text_target 會執行——click/select target 未讀就過期。", cost:"0 調用",
+      cap:"Click 食唔到 text target，反之亦然。驗證器會喺執行之前擋返：發明嘅選項、NaN 機率、非最大值選擇，全部擋晒。"},
+     {t:"先護衞，後動手", d:"輸入前最後再驗：頁面新鮮度、即時幾何、遮擋測試。", cost:"+2 次 CDP 調用",
+      cap:"動畫唔會再令決策失效：幾何位置<b>留到最後一刻</b>先解析。控位移咗或者被遮住就拒絕輸入，唔會撳錯。"},
+     {t:"需要打字先叫細 LLM", d:"TYPE_TEXT 先會叫 Mercury（「Zurich」581 ms、「London」346 ms）。冇任何嘢係寫死。", cost:"1 次文字 API 調用",
+      cap:"文字由目標即場生成，驗證係咪 strict JSON；stale retry 淨係喺成個 helper input 一模一樣嗰陣先會重用。"},
+     {t:"沉澱、記錄、再嚟", d:"短暫等待（≤50 ms；打完 combobox 係 200 ms），先記錄執行，再重新觀察頁面。", cost:"+1 次 CDP 調用",
+      cap:"執行<b>先記錄、後觀察</b>結果，所以過期嘅讀取永遠抹唔走一個動作。成個循環：大約 4 次 browser 調用加 1 次 API 請求。"}],
+    fanHeads:{win1:"operation → TYPE_TEXT ✓", dead1:"click_target [1..40]——棄用", dead2:"select_target——棄用", win2:`type_text_target → [15]「Where from?」✓`}},
+  comp:{
+    base:[
+     {k:"DOM.resolveNode", d:"逐個逐個咁解析 DOM node，重複又重複"},
+     {k:"Runtime.evaluate", d:"零散嘅頁面讀取"},
+     {k:"Runtime.callFunctionOn", d:"逐 node 嘅函數調用"},
+     {k:"Accessibility.getFullAXTree", d:"完整無障礙樹讀取"},
+     {k:"DOM.getBoxModel + getNodeForLocation", d:"護衞檢查用嘅查詢"},
+     {k:"Input.*（click、key、text）", d:"真正嘅工作"}],
+    cand:[
+     {k:"Runtime.evaluate", d:"原子快照 + 頁面內護衞"},
+     {k:"Input.*（click、key、text）", d:"真正嘅工作——同 baseline 一模一樣"}],
+    note:(rd,cd)=>`兩邊都係做<b>同樣 26 次輸入事件</b>（20 滑鼠、4 鍵盤、2 insertText）。讀頁面開銷由 <b class="mono">${rd} 減到 ${cd}</b>，總耗時由 9.45 s 減到 7.09 s。優化版 evaluate 更少但更「肥」（71 vs 148），因為每次都一次過讀晒全部嘢。`,
+    callout:`💡 <b>鐵證：</b><span class="mono" style="color:var(--resolve)">DOM.resolveNode × 828</span>——原始 loop 逐個 node 不斷咁解析（每次 run 純粹嘥 1.2–1.8 秒），再加 30 次完整無障礙樹讀取（<span class="mono" style="color:var(--ax)">Accessibility.getFullAXTree</span>，約 1.2–1.4 秒）同 40 次 <span class="mono">Runtime.callFunctionOn</span>。優化 loop 全部換成一個 JavaScript 快照，一次 <span class="mono">Runtime.evaluate</span> 讀齊可見控件、名稱、數值同幾何——再用平嘅頁面內護衞代替重新讀取。`,
+    hover:"——懸停棒狀圖睇詳情"},
+  wf:{
+    legend:["Jev 決策","生成文字（Mercury）","執行 + 觀察","結果載入 / DONE"],
+    stepDefault:"點任何一行，睇返嗰下動作。",
+    tipDecide:(ms,d)=>`<b>Jev 決策</b> · ${ms} ms<br><span class="tt-d">${d}</span>`,
+    tipText:(v,ms)=>`<b>Mercury 打「${v}」</b> · ${ms} ms<br><span class="tt-d">細 LLM · 真生成</span>`,
+    tipExec:(ms)=>`<b>執行 + 觀察</b> · ${ms} ms<br><span class="tt-d">護衞 → 輸入 → 無截圖讀取</span>`,
+    tipDone:()=>"<b>結果載入 + 最後一次 Jev 請求</b><br><span class='tt-d'>獨立驗證 7 項全過</span>",
+    searchMark:"搜尋執行 · 5.217 s",
+    counters:(req,ts,acts,texts,t)=>`<span>Jev 請求 <b class="mono" style="color:var(--text)">${req}/${ts}</b> <span style="color:var(--faint)">（包括頁面變更後重問嘅 5 次）</span></span>
+     <span>已執行動作 <b class="mono" style="color:var(--text)">${acts}/11</b></span>
+     <span>文字調用 <b class="mono" style="color:var(--text)">${texts}/2</b></span>
+     <span style="margin-left:auto" class="mono" id="wfClock2">${t} s</span>`,
+    stepHdr:(i,op)=>`<b>第 ${i} 步 · ${op}</b>`,
+    typed:(v,ms,tok)=>`輸入值：<b>「${v}」</b>——Mercury 用咗 ${ms} ms 生成（prompt 約 ${tok} tokens）`,
+    decideLine:(ms,exec,el)=>`Jev 決策：${ms} ms · 執行於 ${exec} s · 觀察完成於 ${el} s`,
+    verifyLine:"獨立驗證：search_page ✓ one_way ✓ origin ✓ destination ✓ date ✓ year ✓ results ✓"},
+  dumb:{
+    axisMs:"任務時間（秒）", axisCdp:"瀏覽器協議調用", axisTs:"TypeSafe 請求",
+    pair:n=>`第 ${n} 對`, median:"中位數", orig:"原始 loop", cand:"Jev ultrafast loop",
+    medOf:"3 次嘅中位數",
+    legend:`<tspan fill="#7c8ba1">●</tspan> 原始 loop&nbsp;&nbsp;&nbsp;<tspan fill="#34d399">●</tspan> jev ultrafast`,
+    tipBase:(p,v,ts,cdp)=>`<b>原始 loop</b> · 第 ${p} 對<br><span class='tt-d'>${v} · ${ts} 次 TypeSafe 請求 · ${cdp} 次 CDP 調用</span>`,
+    tipCand:(p,v,ts,cdp)=>`<b>Jev ultrafast loop</b> · 第 ${p} 對<br><span class='tt-d'>${v} · ${ts} 次 TypeSafe 請求 · ${cdp} 次 CDP 調用</span>`,
+    tipBaseMed:v=>`<b>原始 loop</b> · 3 次嘅中位數<br><span class='tt-d'>${v}</span>`,
+    tipCandMed:v=>`<b>Jev ultrafast loop</b> · 3 次嘅中位數<br><span class='tt-d'>${v}</span>`},
+  ab:{
+    ms:"優化版三對全勝（n=3 嘅雙尾符號檢定 p = 0.25——方向一致，但證據本来就薄）。兩邊都係同一套 Jev + Mercury 模型；差距全部嚟自 loop 代碼。",
+    cdp:"調用由 1,092 跌到 101（中位數），實際輸入事件完全不變（26 = 26）。成個降幅都係讀頁面開銷，唔係少咗自動化。",
+    ts:"TypeSafe 請求由 22 減到 17（中位數）：更少重複觀察、更少被作廢嘅決策。"},
+  foot:`數據來源：<span class="mono">docs/performance.md</span> · <span class="mono">docs/flights-measurement.json</span>（錄影 run + 逐動作時間）· <span class="mono">docs/full-speed-measurement.json</span>（對照 run + 逐 run CDP 組成）· <span class="mono">docs/measurement.json</span>。<br>
+    老實講：A/B 只有 <b>3 對</b>、一個任務、一個瀏覽器 profile（雙尾符號檢定 p = 0.25——有方向性，但唔係統計學證明）；Google 網絡同快取係真實環境；瀏覽器設置、初次導航同事後獨立驗證唔計入時鐘。DONE 從來唔當係證明——結果係獨立驗證過嘅。第 1 部分係 <span class="mono">agent.py</span> / <span class="mono">snapshot.js</span> 嘅忠實 walkthrough，調用次數用實測中位數。`}
+};
+
+/* ============================ REAL DATA ============================ */
+const PAIRS = [
+  {pair:1, base:{ms:11214, ts:26, cdp:1102}, cand:{ms: 6964, ts:17, cdp:101}},
+  {pair:2, base:{ms: 8984, ts:21, cdp:1090}, cand:{ms: 7913, ts:18, cdp:103}},
+  {pair:3, base:{ms: 9450, ts:22, cdp:1092}, cand:{ms: 7092, ts:16, cdp: 97}},
+];
+const MEDIAN = {base:{ms:9450, ts:22, cdp:1092}, cand:{ms:7092, ts:17, cdp:101}};
+const COMP_BASE = [
+  {n:828, ms:1793, c:"#f87171"}, {n:148, ms:1453, c:"#38bdf8"}, {n: 40, ms: 255, c:"#f59e0b"},
+  {n: 30, ms:1383, c:"#a78bfa"}, {n:  20, ms:  21, c:"#fbbf24"}, {n:  26, ms: 410, c:"#34d399"},
+];
+const COMP_CAND = [ {n:71, c:"#38bdf8"}, {n:26, c:"#34d399"} ];
+const RUN = {total:7073, requests:17, actions:[
+  {op:"CLICK",    act:{en:"Change ticket type · Round trip", zh:"轉票種 · 來回"}, text:null, exec:336,  el:372,  lat:299, tlat:0},
+  {op:"CLICK",    act:{en:"One way", zh:"單程"}, text:null, exec:640,  el:725,  lat:217, tlat:0},
+  {op:"TYPE_TEXT",act:{en:"Where from?", zh:"出發地？"}, text:{en:"Zurich",zh:"Zurich"}, exec:1595, el:1770, lat:126, tlat:581},
+  {op:"CLICK",    act:{en:"Suggestion: Zürich, Switzerland", zh:"建議：蘇黎世（瑞士）"}, text:null, exec:1930, el:1959, lat:121, tlat:0},
+  {op:"TYPE_TEXT",act:{en:"Where to?", zh:"目的地？"}, text:{en:"London",zh:"London"}, exec:2748, el:2875, lat:120, tlat:346},
+  {op:"CLICK",    act:{en:"Suggestion: London, United Kingdom", zh:"建議：倫敦（英國）"}, text:null, exec:3053, el:3085, lat:143, tlat:0},
+  {op:"CLICK",    act:{en:"Open Departure (date picker)", zh:"打開出發日期（日期選擇器）"}, text:null, exec:3452, el:3520, lat:112, tlat:0},
+  {op:"CLICK",    act:{en:"Sunday, September 20, 2026", zh:"2026年9月20日（星期日）"}, text:null, exec:3769, el:3810, lat:203, tlat:0},
+  {op:"CLICK",    act:{en:"Done · confirm date", zh:"完成 · 確認日期"}, text:null, exec:4097, el:4136, lat:247, tlat:0},
+  {op:"CLICK",    act:{en:"Search", zh:"搜尋"}, text:null, exec:5217, el:5320, lat:178, tlat:0},
+  {op:"WAIT",     act:{en:"Wait for the page to update", zh:"等頁面更新"}, text:null, exec:5587, el:5594, lat:141, tlat:0},
+  {op:"DONE",     act:{en:"Results visible — verified: one-way, Zürich, London, Sep 20 2026, 3 flights",
+                       zh:"結果可見——已驗證：單程、蘇黎世、倫敦、2026-09-20、3 班航班"}, text:null, exec:7073, el:7073, lat:1479, tlat:0},
+]};
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+const T = () => STR[LANG];
+
+/* ============================ PART 1 · LOOP ============================ */
+const PHASES = () => T().loopSteps.phases;
+let lp = 0, lpTimer = null, lpPlaying = false;
+function loopRender(){
+  const el = $("loopDiagram"); el.innerHTML = "";
+  const ph = PHASES();
+  ph.forEach((p,i)=>{
+    const row = document.createElement("div");
+    row.className = "phase" + (i===lp?" active": i<lp?" done":"");
+    let fan = "";
+    if (p.fanout){
+      const fh = T().loopSteps.fanHeads;
+      fan = `<div class="fanout">
+        <span class="head win">${fh.win1}</span>
+        <span class="head dead">${fh.dead1}</span>
+        <span class="head dead">${fh.dead2}</span>
+        <span class="head win">${fh.win2}</span>
+      </div>`;
+    }
+    row.innerHTML = `<span class="tag">${LANG==="en" ? "step "+(i+1) : "第 "+(i+1)+" 步"}</span>
+      <div class="body"><div class="t">${p.t}</div><div class="d">${p.d}</div>${fan}</div>
+      <span class="cost">${p.cost}</span>`;
+    el.appendChild(row);
+  });
+  $("loopCaption").innerHTML = ph[lp].cap;
+  $("loopPos").textContent = T().stepPos(lp+1, ph.length);
+  $("loopPrev").disabled = lp===0; $("loopNext").disabled = lp===ph.length-1;
+}
+function loopStop(){ lpPlaying=false; clearInterval(lpTimer); $("loopPlay").textContent=T().play; }
+$("loopPlay").onclick = () => {
+  if (lpPlaying) return loopStop();
+  lpPlaying = true; $("loopPlay").textContent = T().pause;
+  if (lp >= PHASES().length-1) lp = 0;
+  loopRender();
+  lpTimer = setInterval(()=>{ if (lp < PHASES().length-1){ lp++; loopRender(); } else loopStop(); }, 1600);
+};
+$("loopNext").onclick = ()=>{ loopStop(); lp=Math.min(lp+1,PHASES().length-1); loopRender(); };
+$("loopPrev").onclick = ()=>{ loopStop(); lp=Math.max(lp-1,0); loopRender(); };
+$("loopReset").onclick = ()=>{ loopStop(); lp=0; loopRender(); };
+
+/* ============================ PART 2 · COMPOSITION ============================ */
+function compBar(elId, segs, total){
+  const bar = $(elId); bar.innerHTML = "";
+  segs.forEach(s=>{
+    const sp = document.createElement("span");
+    sp.style.width = (s.n/total*100) + "%";
+    sp.style.background = s.c;
+    bar.appendChild(sp);
+  });
+}
+function compRender(){
+  const L = T();
+  compBar("barBase", COMP_BASE, 1092);
+  compBar("barCand", COMP_CAND, 97);
+  const baseSegs = L.comp.base, candSegs = L.comp.cand;
+  [...$("barBase").children].forEach((sp,i)=>{
+    const s = COMP_BASE[i], d = baseSegs[i];
+    sp.title = `${d.k}: ${fmt(s.n)}${s.ms? " · ≈"+(s.ms/1000).toFixed(2)+" s":""} — ${d.d}`;
+  });
+  [...$("barCand").children].forEach((sp,i)=>{
+    const s = COMP_CAND[i], d = candSegs[i];
+    sp.title = `${d.k}: ${fmt(s.n)} — ${d.d}`;
+  });
+  $("compLegend").innerHTML = baseSegs.map((d,i)=>
+    `<span><span class="sw" style="background:${COMP_BASE[i].c}"></span>${d.k} <b class="mono" style="color:var(--text)">${fmt(COMP_BASE[i].n)}</b></span>`).join("")
+    + `<span style="color:var(--faint)">${L.comp.hover}</span>`;
+  $("compNote").innerHTML = L.comp.note("1,066","71");
+  $("compCallout").innerHTML = L.comp.callout;
+}
+
+/* ============================ PART 3 · WATERFALL ============================ */
+const WF = {W:1060, L:290, R:24, rowH:33, top:34};
+const px = ms => WF.L + (ms/RUN.total)*(WF.W-WF.L-WF.R);
+const CL = {jev:"#34d399", gen:"#fbbf24", exec:"#38bdf8", base:"#64748b"};
+const rows = RUN.actions.map((a,i)=>{
+  const start = i===0 ? a.exec - a.lat - a.tlat : RUN.actions[i-1].el;
+  const dEnd = start + a.lat, tEnd = dEnd + a.tlat;
+  const eStart = Math.max(dEnd, tEnd, a.exec);
+  return {...a, i, start, dEnd, tEnd, eStart, eEnd:a.el};
+});
+function rowLabel(r){
+  const act = r.act[LANG==="en"?"en":"zh"];
+  if (r.op==="DONE") return LANG==="en" ? "DONE · verified ✓" : "DONE · 已驗證 ✓";
+  const max = LANG==="en" ? 34 : 16;
+  const a = act.length > max ? act.slice(0,max-1)+"…" : act;
+  return `${r.op}: ${a}`;
+}
+function segRect(y, x1, x2, color, tip, rowIdx){
+  if (x2 - x1 < 0.8) return "";
+  const w = Math.max(x2-x1, 1.6);
+  return `<rect x="${x1}" y="${y}" width="${w}" height="18" rx="4" fill="${color}" opacity="0.92"
+    data-tip="${tip.replace(/"/g,"&quot;")}" data-row="${rowIdx}" style="cursor:pointer"/>`;
+}
+function buildWF(){
+  const L = T().wf;
+  let s = "";
+  for (let t=0; t<=7000; t+=1000){
+    s += `<line x1="${px(t)}" y1="${WF.top-6}" x2="${px(t)}" y2="${WF.top+rows.length*WF.rowH+4}" stroke="#1d2836" stroke-width="1"/>
+          <text x="${px(t)}" y="${WF.top-12}" fill="#5b6b7f" font-size="10" text-anchor="middle">${(t/1000).toFixed(0)}s</text>`;
+  }
+  rows.forEach((r,i)=>{
+    const y = WF.top + i*WF.rowH;
+    s += `<text x="8" y="${y+13}" fill="${r.op==="DONE" ? "#8496ab" : "#dce5f0"}" font-size="10.5">${rowLabel(r)}</text>`;
+    const actFull = r.act[LANG==="en"?"en":"zh"];
+    s += segRect(y, px(r.start), px(r.dEnd), CL.jev, L.tipDecide(r.lat, `${r.op} → ${actFull}`), i);
+    if (r.tlat>0) s += segRect(y, px(r.dEnd), px(r.tEnd), CL.gen, L.tipText(r.text[LANG==="en"?"en":"zh"], r.tlat), i);
+    s += segRect(y, px(Math.max(r.eStart, r.dEnd)), px(r.eEnd), r.op==="DONE"? CL.base : CL.exec,
+      r.op==="DONE" ? L.tipDone() : L.tipExec(r.eEnd-r.eStart), i);
+  });
+  const yS = WF.top, yE = WF.top + rows.length*WF.rowH + 4;
+  s += `<line x1="${px(5217)}" y1="${yS}" x2="${px(5217)}" y2="${yE}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="${px(5217)+5}" y="${yS+9}" fill="#38bdf8" font-size="10.5" class="mark">${L.searchMark}</text>`;
+  s += `<line id="playhead" x1="${px(0)}" y1="${yS-2}" x2="${px(0)}" y2="${yE}" stroke="#f87171" stroke-width="2" opacity="0"/>`;
+  $("wf").innerHTML = s;
+  $("wfLegend").innerHTML = L.legend.map((t,i)=>
+    `<span><span class="sw" style="background:${[CL.jev,CL.gen,CL.exec,CL.base][i]}"></span>${t}</span>`).join("");
+}
+let wfT = 0, wfSpeed = 1, wfPlaying = false, wfLast = 0, wfRaf = null;
+function counters(t){
+  let req=0, texts=0, acts=0;
+  rows.forEach(r=>{
+    if (t >= r.start) req++;
+    if (r.tlat>0 && t >= r.dEnd) texts++;
+    if (t >= r.eStart && r.op!=="DONE") acts++;
+  });
+  req = Math.min(req + 5, RUN.requests); // +5 stale re-decisions — see note
+  $("wfCounters").innerHTML = T().wf.counters(req, RUN.requests, acts, texts, (t/1000).toFixed(3));
+}
+function wfFrame(ts){
+  if (!wfLast) wfLast = ts;
+  wfT += (ts - wfLast) * wfSpeed; wfLast = ts;
+  if (wfT >= RUN.total){ wfT = RUN.total; wfDraw(); counters(wfT); return wfStop(); }
+  wfDraw(); counters(wfT);
+  wfRaf = requestAnimationFrame(wfFrame);
+}
+function wfDraw(){
+  const ph = document.getElementById("playhead");
+  if (!ph) return;
+  ph.setAttribute("x1", px(wfT)); ph.setAttribute("x2", px(wfT)); ph.setAttribute("opacity", wfT>0 ? "1" : "0");
+  const el = $("wfClock"); if (el) el.textContent = (wfT/1000).toFixed(3)+" s";
+  const c2 = $("wfClock2"); if (c2) c2.textContent = (wfT/1000).toFixed(3)+" s";
+  document.querySelectorAll("#wf rect[data-row]").forEach(r=>{
+    const i = +r.dataset.row, row = rows[i];
+    const active = wfT >= row.start && wfT < row.eEnd + (i===rows.length-1? 1:0);
+    r.setAttribute("stroke", active ? "#f87171" : "none");
+    r.setAttribute("stroke-width", active ? "1.5" : "0");
+  });
+}
+function wfStop(){ wfPlaying=false; cancelAnimationFrame(wfRaf); $("wfPlay").textContent=T().play; wfLast=0; }
+$("wfPlay").onclick = ()=>{
+  if (wfPlaying) return wfStop();
+  wfPlaying = true; $("wfPlay").textContent=T().pause; wfLast=0;
+  if (wfT >= RUN.total) wfT = 0;
+  wfRaf = requestAnimationFrame(wfFrame);
+};
+document.querySelectorAll("#wfSpeed button").forEach(b=> b.onclick = ()=>{
+  wfSpeed = +b.dataset.s;
+  document.querySelectorAll("#wfSpeed button").forEach(x=>x.classList.toggle("active", x===b));
+});
+const tip = $("tooltip");
+document.addEventListener("mousemove", e=>{
+  const t = e.target.closest ? e.target.closest("rect[data-tip]") : null;
+  if (t){ tip.innerHTML = t.dataset.tip; tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX+14, innerWidth-350)+"px"; tip.style.top = (e.clientY+14)+"px";
+  } else tip.style.opacity = 0;
+});
+$("wf").addEventListener("click", e=>{
+  const t = e.target.closest && e.target.closest("rect[data-row]");
+  if (!t) return;
+  const L = T().wf, r = rows[+t.dataset.row];
+  const parts = [L.stepHdr(r.i+1, r.op) + ` → <b>${r.act[LANG==="en"?"en":"zh"]}</b>`];
+  if (r.text) parts.push(L.typed(r.text[LANG==="en"?"en":"zh"], r.tlat, r.text.en==="Zurich"?440:483));
+  parts.push(L.decideLine(r.lat, (r.exec/1000).toFixed(3), (r.el/1000).toFixed(3)));
+  if (r.op==="DONE") parts.push(L.verifyLine);
+  $("wfStep").innerHTML = parts.join("<br>");
+});
+
+/* ============================ PART 4 · DUMBBELLS ============================ */
+const METRICS = {
+  ms:  {max:12000, fmt:v=>(v/1000).toFixed(2)+" s", axis:"axisMs", delta:v=>`−${(100*(1-v)).toFixed(1)}%`},
+  cdp: {max:1200,  fmt:v=>fmt(v), axis:"axisCdp", delta:v=>`−${(100*(1-v)).toFixed(0)}%`},
+  ts:  {max:30,    fmt:v=>fmt(v), axis:"axisTs", delta:v=>`−${(100*(1-v)).toFixed(0)}%`},
+};
+let metric = "ms";
+function buildDumb(){
+  const L = T().dumb, m = METRICS[metric];
+  const W=1060, Lx=150, R=110, top=36, rowH=56;
+  const X = v => Lx + (v/m.max)*(W-Lx-R);
+  let s = `<text x="${Lx-24}" y="16" fill="#8496ab" font-size="11">${L[m.axis]}</text>`;
+  for (let i=0;i<=4;i++){
+    const v = m.max*i/4;
+    s += `<line x1="${X(v)}" y1="${top}" x2="${X(v)}" y2="${top+4*rowH}" stroke="#1d2836"/>
+          <text x="${X(v)}" y="${top-6}" fill="#5b6b7f" font-size="10" text-anchor="middle">${metric==="ms"? (v/1000).toFixed(0)+"s":fmt(v)}</text>`;
+  }
+  const vfmt = v => metric==="ms" ? (v/1000).toFixed(2)+" s" : fmt(v);
+  PAIRS.forEach((p,i)=>{
+    const y = top + i*rowH + 14;
+    const b = X(p.base[metric]), c = X(p.cand[metric]);
+    s += `<text x="8" y="${y+4}" fill="#8496ab" font-size="11.5">${L.pair(p.pair)}</text>
+      <line x1="${b}" y1="${y}" x2="${c}" y2="${y}" stroke="#33465e" stroke-width="2"/>
+      <circle cx="${b}" cy="${y}" r="8" fill="#7c8ba1" data-tip="${L.tipBase(p.pair, vfmt(p.base[metric]), p.base.ts, p.base.cdp).replace(/"/g,"&quot;")}"/>
+      <circle cx="${c}" cy="${y}" r="8" fill="#34d399" data-tip="${L.tipCand(p.pair, vfmt(p.cand[metric]), p.cand.ts, p.cand.cdp).replace(/"/g,"&quot;")}"/>
+      <text x="${W-8}" y="${y+4}" fill="#34d399" font-size="11.5" text-anchor="end">${m.delta(p.cand[metric]/p.base[metric])}</text>`;
+  });
+  const y = top + 3*rowH + 14, b = X(MEDIAN.base[metric]), c = X(MEDIAN.cand[metric]);
+  s += `<line x1="${Lx}" y1="${y-24}" x2="${W-R+60}" y2="${y-24}" stroke="#1d2836"/>
+    <text x="8" y="${y+4}" fill="#dce5f0" font-size="11.5" font-weight="700">${L.median}</text>
+    <line x1="${b}" y1="${y}" x2="${c}" y2="${y}" stroke="#4b5b70" stroke-width="2.5"/>
+    <circle cx="${b}" cy="${y}" r="9" fill="#7c8ba1" data-tip="${L.tipBaseMed(vfmt(MEDIAN.base[metric])).replace(/"/g,"&quot;")}"/>
+    <circle cx="${c}" cy="${y}" r="9" fill="#34d399" stroke="#a7f3d0" data-tip="${L.tipCandMed(vfmt(MEDIAN.cand[metric])).replace(/"/g,"&quot;")}"/>
+    <text x="${W-8}" y="${y+4}" fill="#a7f3d0" font-size="12.5" font-weight="700" text-anchor="end">${m.delta(MEDIAN.cand[metric]/MEDIAN.base[metric])}</text>
+    <text x="${Lx-24}" y="${top+4*rowH+22}" fill="#5b6b7f" font-size="10.5">${L.legend}</text>`;
+  $("dumb").innerHTML = s;
+  $("abNote").innerHTML = T().ab[metric];
+}
+document.querySelectorAll("#metricSeg button").forEach(b=> b.onclick = ()=>{
+  metric = b.dataset.m;
+  document.querySelectorAll("#metricSeg button").forEach(x=>x.classList.toggle("active", x===b));
+  buildDumb();
+});
+
+/* ============================ PART 6 · KAHNEMAN ============================ */
+let kbOpen = 0;
+function kbRender(){
+  const K = T().kb;
+  let s = `<table class="ktable"><tr><th></th><th>${K.t1}</th><th>${K.t2}</th></tr>` +
+    K.rows.map(r=>`<tr><td>${r.k}</td><td>${r.a}</td><td>${r.b}</td></tr>`).join("") + `</table>`;
+  s += K.cards.map((c,i)=>`<div class="kcard${i===kbOpen?" open":""}" data-i="${i}">
+      <div class="khead"><span>${c.t}</span><span class="karrow">${i===kbOpen?"－":"＋"}</span></div>
+      <div class="kbody">${c.b}</div></div>`).join("");
+  $("kb").innerHTML = s;
+  $("kbCallout").innerHTML = K.callout;
+}
+$("kb").addEventListener("click", e=>{
+  const h = e.target.closest && e.target.closest(".khead");
+  if (!h) return;
+  const i = +h.parentElement.dataset.i;
+  kbOpen = (kbOpen === i) ? -1 : i; // click again to collapse
+  kbRender();
+});
+
+/* ============================ i18n plumbing ============================ */
+let LANG = "en";
+try { LANG = localStorage.getItem("jevVizLang") || "en"; } catch(e){}
+function applyLang(){
+  const L = T();
+  document.documentElement.lang = LANG==="en" ? "en" : "zh-HK";
+  document.title = L.title;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.innerHTML = L[el.dataset.i18n] ?? ""; });
+  $("h1").innerHTML = L.h1;
+  $("subTitle").innerHTML = L.subTitle;
+  $("loopPlay").textContent = lpPlaying ? L.pause : L.play;
+  $("loopPrev").textContent = L.prev; $("loopNext").textContent = L.next; $("loopReset").textContent = L.reset;
+  $("wfPlay").textContent = wfPlaying ? L.pause : L.play;
+  $("wfStep").innerHTML = L.wf.stepDefault;
+  $("foot").innerHTML = L.foot;
+  document.querySelectorAll("#langSeg button").forEach(b=> b.classList.toggle("active", b.dataset.l===LANG));
+  loopRender(); compRender(); buildWF(); buildDumb(); counters(wfT); wfDraw(); kbRender();
+}
+document.querySelectorAll("#langSeg button").forEach(b=> b.onclick = ()=>{
+  LANG = b.dataset.l;
+  try { localStorage.setItem("jevVizLang", LANG); } catch(e){}
+  applyLang();
+});
+applyLang();
+</script>
+</body>
+</html>
