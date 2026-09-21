@@ -2,6 +2,23 @@
 
 # Jev Ultrafast ⚡
 
+> [!NOTE]
+> **Fork provenance.** This repository's source is [`browser-use/jev-ultrafast`](https://github.com/browser-use/jev-ultrafast)
+> (MIT, © 2026 Browser Use — retained in [LICENSE](LICENSE)), forked at upstream commit `1231850`
+> and kept in sync via the `upstream` remote:
+>
+> ```bash
+> git remote add upstream https://github.com/browser-use/jev-ultrafast.git   # already configured
+> git fetch upstream && git rebase upstream/main
+> ```
+>
+> Everything added by this fork:
+> - [`laya/`](laya/README.md) — a local, Jev-dialect decision endpoint (Laya sidecar) with remote
+>   setup, conformance and smoke tests, so the agent runs without any cloud call;
+> - `jev_ultrafast/model.py` — a 3-line `TYPESAFE_ENDPOINT` override to point decisions at it;
+> - [`docs/jev-performance.html`](docs/jev-performance.html) — a bilingual (English / 香港粵語)
+>   interactive explainer of the architecture, built from the upstream repo's shipped measurements.
+
 > [!IMPORTANT]
 > **The Browser Use Cloud waitlist is open.** Get early access to ultrafast browser agents in the cloud.
 > **[Join the waitlist →](https://browser-use.com/ultrafast?utm_source=github&utm_medium=readme&utm_campaign=jev-ultrafast)**
