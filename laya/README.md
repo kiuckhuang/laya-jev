@@ -71,7 +71,9 @@ passes.
   bypass the system config: `ssh -F ~/.ssh/config ...`.
 - To restart the sidecar over ssh, **do not** `pkill -f laya_jev_sidecar` from a
   shell whose own command line contains that pattern — it kills itself. Use the
-  bracket trick: `pkill -f "laya_jev_sideca[r]"`.
+  bracket trick: `pkill -f "laya_jev_sideca[r]"` — **and put the kill and the
+  relaunch in separate ssh calls**: a combined one-liner still self-matches,
+  because the relaunch line itself contains the plain pattern.
 - If your `~/.ssh/config` already forwards local port 7185 (common vLLM
   convention), reuse it — a second `-L 7185` fails with exit 255.
 - The first call at a new batch shape compiles kernels (~1.7 s); the sidecar warms
